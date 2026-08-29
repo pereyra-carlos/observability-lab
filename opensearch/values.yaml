@@ -1,0 +1,57 @@
+singleNode: true
+replicas: 1
+
+masterService: opensearch
+
+clusterName: opensearch
+
+opensearchJavaOpts: "-Xms2g -Xmx2g"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 3Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+persistence:
+  enabled: true
+  storageClass: local-path
+  accessModes:
+    - ReadWriteOnce
+  size: 20Gi
+
+nodeSelector:
+  kubernetes.io/hostname: ubuntu
+
+priorityClassName: lab-low
+
+extraEnvs:
+  - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-admin
+        key: password
+  - name: cluster.routing.allocation.disk.threshold_enabled
+    value: "true"
+  - name: cluster.routing.allocation.disk.watermark.enable_for_single_data_node
+    value: "true"
+  - name: cluster.routing.allocation.disk.watermark.low
+    value: 80%
+  - name: cluster.routing.allocation.disk.watermark.high
+    value: 85%
+  - name: cluster.routing.allocation.disk.watermark.flood_stage
+    value: 90%
+
+persistencePolicy:
+  enabled: false
+
+rbac:
+  create: false
+
+sysctlInit:
+  enabled: false
+
+securityConfig:
+  internalUsersSecret: opensearch-internal-users

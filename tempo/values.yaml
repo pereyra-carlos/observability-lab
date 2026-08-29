@@ -1,0 +1,44 @@
+replicas: 1
+
+priorityClassName: lab-low
+
+nodeSelector:
+  kubernetes.io/hostname: ubuntu
+
+persistence:
+  enabled: true
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+tempo:
+  repository: grafana/tempo
+  retention: 24h
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+  metricsGenerator:
+    enabled: false
+
+service:
+  type: ClusterIP

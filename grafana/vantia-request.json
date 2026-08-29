@@ -1,0 +1,323 @@
+{
+  "uid": "vantia-request",
+  "title": "Vantia \u2014 one request, both signals",
+  "description": "Click a trace_id in the table and the two panels below fill with the same request: once as log lines, once as a waterfall. The trace_id in every log line is the entire link between them.",
+  "tags": [
+    "vantia",
+    "correlation"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "trace_id",
+        "label": "trace_id",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "skipUrlSync": false,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Slowest requests \u2014 click a trace_id to fill the two panels below",
+      "datasource": {
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch-logs"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch-logs"
+          },
+          "query": "stage:generate AND _exists_:trace_id",
+          "queryType": "lucene",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_data",
+              "settings": {
+                "size": "20"
+              }
+            }
+          ],
+          "bucketAggs": [],
+          "timeField": "@timestamp"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "total_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 8000
+                    },
+                    {
+                      "color": "red",
+                      "value": 20000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "latency_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost_usd"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 5
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trace_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Ver abajo, en esta pantalla",
+                    "url": "d/vantia-request?var-trace_id=${__value.raw}"
+                  },
+                  {
+                    "title": "Abrir en Explore (logs + traza)",
+                    "url": "/explore?schemaVersion=1&orgId=1&panes=%7B%22logs%22%3A%20%7B%22datasource%22%3A%20%22opensearch-logs%22%2C%20%22queries%22%3A%20%5B%7B%22refId%22%3A%20%22A%22%2C%20%22datasource%22%3A%20%7B%22type%22%3A%20%22grafana-opensearch-datasource%22%2C%20%22uid%22%3A%20%22opensearch-logs%22%7D%2C%20%22query%22%3A%20%22trace_id%3A%5C%22${__value.raw}%5C%22%22%2C%20%22queryType%22%3A%20%22lucene%22%2C%20%22metrics%22%3A%20%5B%7B%22id%22%3A%20%221%22%2C%20%22type%22%3A%20%22logs%22%7D%5D%2C%20%22bucketAggs%22%3A%20%5B%5D%2C%20%22timeField%22%3A%20%22%40timestamp%22%7D%5D%2C%20%22range%22%3A%20%7B%22from%22%3A%20%22now-6h%22%2C%20%22to%22%3A%20%22now%22%7D%7D%2C%20%22trace%22%3A%20%7B%22datasource%22%3A%20%22tempo-traces%22%2C%20%22queries%22%3A%20%5B%7B%22refId%22%3A%20%22A%22%2C%20%22datasource%22%3A%20%7B%22type%22%3A%20%22tempo%22%2C%20%22uid%22%3A%20%22tempo-traces%22%7D%2C%20%22queryType%22%3A%20%22traceql%22%2C%20%22query%22%3A%20%22${__value.raw}%22%7D%5D%2C%20%22range%22%3A%20%7B%22from%22%3A%20%22now-6h%22%2C%20%22to%22%3A%20%22now%22%7D%7D%7D"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "@timestamp",
+                "request_id",
+                "trace_id",
+                "tenant",
+                "scenario",
+                "model",
+                "status",
+                "latency_ms",
+                "total_ms",
+                "tokens_out",
+                "cost_usd"
+              ]
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "total_ms",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {
+              "@timestamp": 0,
+              "total_ms": 1,
+              "latency_ms": 2,
+              "tenant": 3,
+              "scenario": 4,
+              "model": 5,
+              "tokens_out": 6,
+              "cost_usd": 7,
+              "status": 8,
+              "request_id": 9,
+              "trace_id": 10
+            },
+            "renameByName": {
+              "total_ms": "el cliente esper\u00f3",
+              "latency_ms": "tard\u00f3 la etapa",
+              "tokens_out": "tokens",
+              "cost_usd": "costo"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "The logs of this request \u2014 click a trace_id above",
+      "description": "Empty until a trace_id is chosen. Every log line carries one.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Pick a request above: click its trace_id."
+        },
+        "overrides": []
+      },
+      "datasource": {
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch-logs"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch-logs"
+          },
+          "query": "trace_id:\"${trace_id}\"",
+          "queryType": "lucene",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "logs",
+              "settings": {
+                "limit": "50"
+              }
+            }
+          ],
+          "bucketAggs": [],
+          "timeField": "@timestamp"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "traces",
+      "title": "The same request, drawn \u2014 click a trace_id above",
+      "description": "Empty until a trace_id is chosen. Same request as the panel above, as a waterfall.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Pick a request above: click its trace_id."
+        },
+        "overrides": []
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo-traces"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo-traces"
+          },
+          "queryType": "traceql",
+          "query": "${trace_id}"
+        }
+      ]
+    }
+  ]
+}

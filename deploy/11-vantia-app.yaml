@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vantia-gateway
+  namespace: vantia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vantia-gateway
+  template:
+    metadata:
+      labels:
+        app: vantia-gateway
+        component: assistant
+    spec:
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: gateway
+          image: sauay/vantia:0.2.0
+          command:
+            - uvicorn
+            - vantia.gateway:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --log-level
+            - warning
+          env:
+            - name: VANTIA_ROLE
+              value: gateway
+            - name: REDIS_URL
+              value: redis://vantia-redis:6379/0
+            # FQDN on purpose: the app lives in the vantia namespace and the
+            # collector in observability, so a bare service name does not resolve.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vantia-gateway
+  namespace: vantia
+spec:
+  type: NodePort
+  selector:
+    app: vantia-gateway
+  ports:
+    - port: 8080
+      targetPort: http
+      nodePort: 30830
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vantia-retrieval
+  namespace: vantia
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vantia-retrieval
+  template:
+    metadata:
+      labels:
+        app: vantia-retrieval
+        component: assistant
+    spec:
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: retrieval
+          image: sauay/vantia:0.2.0
+          env:
+            - name: VANTIA_ROLE
+              value: retrieval
+            - name: REDIS_URL
+              value: redis://vantia-redis:6379/0
+            # FQDN on purpose: the app lives in the vantia namespace and the
+            # collector in observability, so a bare service name does not resolve.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
+          resources:
+            requests:
+              cpu: 25m
+              memory: 80Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vantia-llm-worker
+  namespace: vantia
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vantia-llm-worker
+  template:
+    metadata:
+      labels:
+        app: vantia-llm-worker
+        component: assistant
+    spec:
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: llm-worker
+          image: sauay/vantia:0.2.0
+          env:
+            - name: VANTIA_ROLE
+              value: llm-worker
+            - name: REDIS_URL
+              value: redis://vantia-redis:6379/0
+            # FQDN on purpose: the app lives in the vantia namespace and the
+            # collector in observability, so a bare service name does not resolve.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
+          resources:
+            requests:
+              cpu: 25m
+              memory: 80Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi

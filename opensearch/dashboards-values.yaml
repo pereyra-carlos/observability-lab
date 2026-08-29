@@ -1,0 +1,43 @@
+replicaCount: 1
+
+opensearchHosts: "https://opensearch:9200"
+
+nodeSelector:
+  kubernetes.io/hostname: ubuntu
+
+priorityClassName: lab-low
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+service:
+  type: NodePort
+  port: 5601
+  nodePort: 30832
+
+extraEnvs:
+  - name: OPENSEARCH_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-dashboards
+        key: username
+  - name: OPENSEARCH_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-dashboards
+        key: password
+
+config:
+  opensearch_dashboards.yml: |
+    server.host: "0.0.0.0"
+    server.name: vantia-logs
+    opensearch.ssl.verificationMode: none
+    opensearch.requestHeadersWhitelist: [authorization, securitytenant]
+    opensearch_security.multitenancy.enabled: false
+    opensearch_security.readonly_mode.roles: [kibana_read_only]
+    opensearch_security.cookie.secure: false

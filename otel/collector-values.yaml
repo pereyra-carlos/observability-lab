@@ -1,0 +1,93 @@
+mode: deployment
+replicaCount: 1
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+priorityClassName: lab-low
+
+nodeSelector:
+  kubernetes.io/hostname: ubuntu
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+presets:
+  kubernetesAttributes:
+    enabled: true
+
+service:
+  enabled: true
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    prometheus: null
+    jaeger: null
+    zipkin: null
+
+  processors:
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 20
+    batch:
+      timeout: 5s
+      send_batch_size: 512
+
+  exporters:
+    # This collector build renamed the OTLP gRPC exporter to otlp_grpc.
+    # Using the old name still works via auto-rewrite, which is going away.
+    otlp_grpc/tempo:
+      endpoint: tempo:4317
+      tls:
+        insecure: true
+    debug:
+      verbosity: basic
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, k8s_attributes, batch]
+        exporters: [otlp_grpc/tempo]
+      metrics: null
+      logs: null
+    telemetry:
+      metrics:
+        readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: 0.0.0.0
+                  port: 8888

@@ -1,0 +1,46 @@
+{
+  "policy": {
+    "policy_id": "logs-k8s",
+    "description": "Lifecycle for Vantia's Kubernetes logs. Lab timings are compressed: hot rolls over hourly, warm at 6h, deleted at 24h. Production would be 7d / 90d / 1y with the same three states.",
+    "default_state": "hot",
+    "ism_template": [
+      {
+        "index_patterns": ["logs-k8s-*"],
+        "priority": 100
+      }
+    ],
+    "states": [
+      {
+        "name": "hot",
+        "actions": [
+          {
+            "rollover": {
+              "min_primary_shard_size": "1gb",
+              "min_index_age": "1h"
+            }
+          }
+        ],
+        "transitions": [
+          { "state_name": "warm", "conditions": { "min_index_age": "6h" } }
+        ]
+      },
+      {
+        "name": "warm",
+        "actions": [
+          { "read_only": {} },
+          { "force_merge": { "max_num_segments": 1 } }
+        ],
+        "transitions": [
+          { "state_name": "delete", "conditions": { "min_index_age": "24h" } }
+        ]
+      },
+      {
+        "name": "delete",
+        "actions": [
+          { "delete": {} }
+        ],
+        "transitions": []
+      }
+    ]
+  }
+}

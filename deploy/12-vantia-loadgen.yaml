@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vantia-loadgen
+  namespace: vantia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vantia-loadgen
+  template:
+    metadata:
+      labels:
+        app: vantia-loadgen
+    spec:
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: loadgen
+          image: sauay/vantia:0.2.0
+          env:
+            - name: VANTIA_ROLE
+              value: loadgen
+            - name: GATEWAY_URL
+              value: http://vantia-gateway:8080
+            - name: LOADGEN_RPS
+              value: "0.3"
+            - name: LOADGEN_WEIGHTS
+              value: 88,5,5,2
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 150m
+              memory: 160Mi

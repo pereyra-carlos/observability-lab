@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensearch-bootstrap
+  namespace: observability
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: opensearch-bootstrap
+    spec:
+      restartPolicy: Never
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: bootstrap
+          image: opensearchproject/opensearch:3.8.0
+          command:
+            - sh
+            - /config/bootstrap.sh
+          env:
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opensearch-admin
+                  key: password
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: opensearch-bootstrap

@@ -1,0 +1,59 @@
+{
+  "index_patterns": ["logs-k8s-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s",
+      "plugins.index_state_management.rollover_alias": "logs-k8s"
+    },
+    "mappings": {
+      "dynamic_templates": [
+        {
+          "strings_as_keyword": {
+            "match_mapping_type": "string",
+            "mapping": { "type": "keyword", "ignore_above": 1024 }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "ts":         { "type": "date" },
+        "level":      { "type": "keyword" },
+        "service":    { "type": "keyword" },
+        "stage":      { "type": "keyword" },
+        "status":     { "type": "keyword" },
+        "scenario":   { "type": "keyword" },
+        "tenant":     { "type": "keyword" },
+        "request_id": { "type": "keyword" },
+        "model":      { "type": "keyword" },
+        "error":      { "type": "keyword" },
+        "index":      { "type": "keyword" },
+        "queue":      { "type": "keyword" },
+        "msg":        { "type": "text" },
+        "log":        { "type": "text" },
+        "latency_ms":     { "type": "double" },
+        "total_ms":       { "type": "double" },
+        "cost_usd":       { "type": "double" },
+        "tokens_in":      { "type": "integer" },
+        "tokens_out":     { "type": "integer" },
+        "docs_found":     { "type": "integer" },
+        "attempts":       { "type": "integer" },
+        "question_chars": { "type": "integer" },
+        "kubernetes": {
+          "properties": {
+            "namespace_name": { "type": "keyword" },
+            "pod_name":       { "type": "keyword" },
+            "container_name": { "type": "keyword" },
+            "host":           { "type": "keyword" },
+            "docker_id":      { "type": "keyword" },
+            "pod_id":         { "type": "keyword" },
+            "labels":     { "type": "object", "dynamic": true },
+            "annotations": { "type": "object", "enabled": false }
+          }
+        }
+      }
+    }
+  }
+}

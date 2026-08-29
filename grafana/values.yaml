@@ -1,0 +1,221 @@
+replicas: 1
+
+priorityClassName: lab-low
+
+nodeSelector:
+  kubernetes.io/hostname: ubuntu
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 3000
+  nodePort: 30833
+
+persistence:
+  enabled: false
+
+adminUser: admin
+admin:
+  existingSecret: grafana-admin
+  userKey: username
+  passwordKey: password
+
+plugins:
+  - grafana-opensearch-datasource
+
+envValueFrom:
+  OS_PASSWORD:
+    secretKeyRef:
+      name: opensearch-grafana
+      key: password
+  # Where the cost alert goes. Created by bootstrap-secrets.sh; set
+  # ALERT_WEBHOOK_URL in the environment to point it somewhere real.
+  ALERT_WEBHOOK_URL:
+    secretKeyRef:
+      name: alert-webhook
+      key: url
+
+grafana.ini:
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  users:
+    allow_sign_up: false
+  auth.anonymous:
+    enabled: false
+  log:
+    mode: console
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: OpenSearch
+        uid: opensearch-logs
+        type: grafana-opensearch-datasource
+        access: proxy
+        url: https://opensearch:9200
+        basicAuth: true
+        basicAuthUser: grafana
+        isDefault: true
+        jsonData:
+          # The write alias, not a concrete index: reading what we write, and one
+          # query spans the whole rollover chain.
+          #
+          # Known cosmetic issue: this plugin's health check only resolves concrete
+          # index names, so it reports "Index not found: logs-k8s" while every query
+          # against the alias works. Verified by pointing a throwaway datasource at
+          # logs-k8s-000033, which reports "Index OK". Not a permissions problem —
+          # the OpenSearch audit log shows zero denials for this account.
+          database: logs-k8s
+          timeField: "@timestamp"
+          version: 3.8.0
+          flavor: opensearch
+          tlsSkipVerify: true
+          logMessageField: msg
+          logLevelField: level
+          # PPL is an alternative query language we do not use. The plugin's health
+          # check calls it when enabled, and a 403 there is reported as
+          # "Index not found", which looks like a broken datasource. Off is both
+          # accurate and less privilege: the grafana account cannot run PPL.
+          pplEnabled: false
+          # trace_id in a log line becomes a link straight into the trace.
+          dataLinks:
+            - field: trace_id
+              matcherRegex: "([a-f0-9]{32})"
+              url: "$${__value.raw}"
+              datasourceUid: tempo-traces
+              urlDisplayLabel: "Ver la traza"
+        secureJsonData:
+          basicAuthPassword: $OS_PASSWORD
+
+      - name: Tempo
+        uid: tempo-traces
+        type: tempo
+        access: proxy
+        url: http://tempo:3200
+        jsonData:
+          # From a span, jump to the log lines of the same request. The lab writes
+          # trace_id into every log line precisely so this link exists.
+          tracesToLogsV2:
+            datasourceUid: opensearch-logs
+            spanStartTimeShift: -5m
+            spanEndTimeShift: 5m
+            filterByTraceID: true
+            customQuery: true
+            query: 'trace_id:"$${__span.traceId}"'
+          nodeGraph:
+            enabled: true
+          search:
+            hide: false
+
+alerting:
+  contactpoints.yaml:
+    apiVersion: 1
+    contactPoints:
+    - orgId: 1
+      name: alert-webhook
+      receivers:
+      - uid: alert-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: ${ALERT_WEBHOOK_URL}
+          httpMethod: POST
+  policies.yaml:
+    apiVersion: 1
+    policies:
+    - orgId: 1
+      receiver: grafana-default-email
+      group_by:
+      - grafana_folder
+      - alertname
+      routes:
+      - receiver: alert-webhook
+        object_matchers:
+        - - lab
+          - '='
+          - observability
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 1h
+  rules.yaml:
+    apiVersion: 1
+    groups:
+    - orgId: 1
+      name: vantia-cost
+      folder: Vantia
+      interval: 1m
+      rules:
+      - uid: vantia-cost-spike
+        title: The model bill is running hot
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          lab: observability
+          severity: warning
+        annotations:
+          summary: Vantia's model spend over the last 10 minutes is {{`{{ $values.B.Value | printf "%.4f"
+            }}`}} USD, past the 0.60 line. Normal is around 0.23.
+          description: 'Something is making the assistant answer at a higher cost than usual: more traffic,
+            longer answers, or requests landing on the expensive model. The dashboard breaks it down by
+            tenant and model.'
+          __dashboardUid__: vantia-request
+          __panelId__: '1'
+        data:
+        - refId: A
+          relativeTimeRange:
+            from: 1800
+            to: 0
+          datasourceUid: opensearch-logs
+          model:
+            refId: A
+            query: stage:generate
+            queryType: lucene
+            timeField: '@timestamp'
+            metrics:
+            - id: '1'
+              type: sum
+              field: cost_usd
+            bucketAggs:
+            - id: '2'
+              type: date_histogram
+              field: '@timestamp'
+              settings:
+                interval: 10m
+                min_doc_count: '1'
+        - refId: B
+          relativeTimeRange:
+            from: 1800
+            to: 0
+          datasourceUid: __expr__
+          model:
+            refId: B
+            type: reduce
+            reducer: max
+            expression: A
+        - refId: C
+          relativeTimeRange:
+            from: 1800
+            to: 0
+          datasourceUid: __expr__
+          model:
+            refId: C
+            type: threshold
+            expression: B
+            conditions:
+            - evaluator:
+                type: gt
+                params:
+                - 0.6
+

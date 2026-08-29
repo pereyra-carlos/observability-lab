@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vantia-redis
+  namespace: vantia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vantia-redis
+  template:
+    metadata:
+      labels:
+        app: vantia-redis
+    spec:
+      priorityClassName: lab-low
+      nodeSelector:
+        kubernetes.io/hostname: ubuntu
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args:
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --maxmemory
+            - 128mb
+            - --maxmemory-policy
+            - allkeys-lru
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vantia-redis
+  namespace: vantia
+spec:
+  selector:
+    app: vantia-redis
+  ports:
+    - port: 6379
+      targetPort: redis

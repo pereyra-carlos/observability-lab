@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: lab-low
+value: -100
+globalDefault: false
+preemptionPolicy: Never
+description: "Lab workloads. Negative priority so the kubelet evicts them before production pods under node pressure. Never preempts anything."
