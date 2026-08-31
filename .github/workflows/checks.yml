@@ -35,14 +35,19 @@ jobs:
           sys.exit(bad)
           PY
 
-      - uses: azure/setup-kubectl@v4
-
+      # kubeconform, not "kubectl apply --dry-run=client --validate=true": that
+      # asks the API server for the schema, so it needs a cluster and cannot run
+      # here. kubeconform carries the schemas and validates offline, which is what
+      # a workflow with no cluster actually needs.
       - name: validate against the kubernetes schema
         run: |
-          for f in deploy/*.yaml; do
-            kubectl apply --dry-run=client --validate=true -f "$f" >/dev/null \
-              && echo "ok    $f" || { echo "FAIL  $f"; exit 1; }
-          done
+          VERSION=v0.6.7
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz kubeconform
+          ./kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            deploy/
 
   charts:
     name: helm values render

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+# Sourced by the other scripts; the shebang is here so shellcheck knows the dialect.
 set -euo pipefail
 
 NS="${NS:-vantia}"
