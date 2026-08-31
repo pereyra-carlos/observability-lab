@@ -117,6 +117,26 @@ datasources:
           search:
             hide: false
 
+# The dashboard is provisioned from a file, like the datasources and the alert.
+# It used to be imported through the API, which writes into Grafana's database —
+# and with persistence disabled that database dies with the pod. The dashboard
+# quietly vanished on the next upgrade while everything file-provisioned came back.
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: vantia
+        orgId: 1
+        folder: Vantia
+        type: file
+        disableDeletion: false
+        allowUiUpdates: false
+        options:
+          path: /var/lib/grafana/dashboards/vantia
+
+dashboardsConfigMaps:
+  vantia: vantia-dashboards
+
 alerting:
   contactpoints.yaml:
     apiVersion: 1

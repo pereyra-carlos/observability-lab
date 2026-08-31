@@ -1,0 +1,107 @@
+name: checks
+
+# Every job here exists because something in this class actually broke during the
+# build. The chart job is the one that matters most: three failed deploys came from
+# values that were valid YAML and wrong anyway — a nesting level too deep, a Grafana
+# template Helm tried to resolve, an annotation that needs a partner.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  manifests:
+    name: kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: parse every yaml
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys, yaml
+          bad = 0
+          for p in sorted(pathlib.Path('.').rglob('*.y*ml')):
+              if '.github' in p.parts:
+                  continue
+              try:
+                  list(yaml.safe_load_all(p.read_text()))
+                  print(f"ok    {p}")
+              except Exception as exc:
+                  print(f"FAIL  {p}: {exc}")
+                  bad += 1
+          sys.exit(bad)
+          PY
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: validate against the kubernetes schema
+        run: |
+          for f in deploy/*.yaml; do
+            kubectl apply --dry-run=client --validate=true -f "$f" >/dev/null \
+              && echo "ok    $f" || { echo "FAIL  $f"; exit 1; }
+          done
+
+  charts:
+    name: helm values render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+
+      - name: add repos
+        run: |
+          helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add fluent https://fluent.github.io/helm-charts
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: render each chart with our values
+        run: |
+          set -e
+          render() {
+            echo "--- $1"
+            helm template "$2" --version "$3" -n observability -f "$4" >/dev/null
+            echo "ok    $4"
+          }
+          render opensearch            opensearch/opensearch                     3.8.0    opensearch/values.yaml
+          render opensearch-dashboards opensearch/opensearch-dashboards          3.8.0    opensearch/dashboards-values.yaml
+          render grafana               grafana/grafana                           10.5.15  grafana/values.yaml
+          render tempo                 grafana/tempo                             1.24.4   tempo/values.yaml
+          render fluent-bit            fluent/fluent-bit                         0.56.0   fluent-bit/values.yaml
+          render otel-collector        open-telemetry/opentelemetry-collector    0.171.0  otel/collector-values.yaml
+
+      - name: the dashboard json is generated, not hand written
+        run: |
+          python3 grafana/make-dashboard.py
+          git diff --exit-code grafana/vantia-request.json \
+            || { echo "FAIL  vantia-request.json is out of sync with make-dashboard.py"; exit 1; }
+
+  app:
+    name: application
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: compile every python file
+        run: python -m compileall -q app scripts grafana opensearch
+
+      - name: build the image
+        run: docker build -t vantia:ci app/
+
+  shell:
+    name: shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: syntax
+        run: for f in scripts/*.sh opensearch/*.sh; do bash -n "$f" && echo "ok    $f"; done
+      - uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
